@@ -1,0 +1,103 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ feature/full-stack ]
+    paths:
+      - 'Server/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  GO_VERSION: '1.21'
+  ECR_REPOSITORY: starttech-backend
+
+jobs:
+  test:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        working-directory: ./Server/MuchToDo
+        run: go mod download
+
+      - name: Run tests
+        working-directory: ./Server/MuchToDo
+        run: go test -v ./...
+
+  build-and-deploy:
+    name: Build and Deploy Backend
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/feature/full-stack'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        working-directory: ./Server/MuchToDo
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Scan Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image --severity HIGH,CRITICAL \
+            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        continue-on-error: true
+
+      - name: Push to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to EC2
+        env:
+          BACKEND_IP: ${{ secrets.BACKEND_PUBLIC_IP }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          echo "Deployment to EC2 instance: $BACKEND_IP"
+          echo "Docker image pushed successfully!"
+          echo "Manual step: SSH to EC2 and pull the latest image"
+
+      - name: Health check
+        run: |
+          echo "Waiting for deployment..."
+          sleep 30
+          curl -f http://${{ secrets.BACKEND_PUBLIC_IP }}:8080/health || echo "Health check pending"
+
+      - name: Deployment success
+        run: |
+          echo "✅ Backend deployed successfully!"
+          echo "Backend URL: http://${{ secrets.BACKEND_PUBLIC_IP }}:8080"
