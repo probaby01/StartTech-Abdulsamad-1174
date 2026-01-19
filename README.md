@@ -53,7 +53,7 @@ go run cmd/api/main.go
 The application uses automated CI/CD pipelines:
 
 - **Frontend:** Builds and deploys to S3 on push to \feature/full-stack\
-- **Backend:** Builds Docker image, pushes to ECR on push to \ffeature/full-stack\
+- **Backend:** Builds Docker image, pushes to ECR on push to \feature/full-stack\
 
 ### AWS Resources
 
