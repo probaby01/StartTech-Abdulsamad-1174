@@ -35,25 +35,25 @@ StartTech-Abdulsamad-1174/
 ### Local Development
 
 **Frontend:**
-\\\Bash
+Bash
 cd Client
 npm install
 npm run dev
-\\\
+
 
 **Backend:**
-\\\ash
+Bash
 cd Server/MuchToDo
 go mod download
 go run cmd/api/main.go
-\\\
+
 
 ## 🔧 Deployment
 
 The application uses automated CI/CD pipelines:
 
-- **Frontend:** Builds and deploys to S3 on push to \feature/full-stack\
-- **Backend:** Builds Docker image, pushes to ECR on push to \feature/full-stack\
+- **Frontend:** Builds and deploys to S3 on push to \feature/full-stack
+- **Backend:** Builds Docker image, pushes to ECR on push to \feature/full-stack
 
 ### AWS Resources
 
