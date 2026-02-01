@@ -1,0 +1,8 @@
+.env
+.env.example
+
+# Ignore logs
+*.log
+
+# Ignore large test/data files
+server_test
